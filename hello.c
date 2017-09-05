@@ -1,1 +1,5 @@
-printf("Hello from Brian Greenberg!");
+#include <stdio.h>
+int main(){
+	printf("Hello world!\n"); 
+}
+ 
