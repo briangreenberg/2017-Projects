@@ -1,0 +1,14 @@
+#Url
+url = "http://www.bowdoin.edu/~congdon/Courses"
+url += "/2600/Data/Wine/winequality-white.csv"
+
+#Get raw data from url fit parse X and y values as floats
+raw_data = urllib.request.urlopen(url)
+X = np.loadtxt(raw_data, delimiter=";", usecols= range(11), dtype='float64')
+raw_data = urllib.request.urlopen(url)
+y = np.loadtxt(raw_data, delimiter=";", usecols= [11], dtype='float64')
+
+print("X shape is", X.shape)
+print("y shape is", y.shape)
+
+crossVals = 5     #sets the crossValidation to 5

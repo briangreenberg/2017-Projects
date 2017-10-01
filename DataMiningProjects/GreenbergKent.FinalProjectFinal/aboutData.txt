@@ -1,0 +1,59 @@
+Brian Greenberg
+Nate Kent
+
+4/20/2017
+
+Project 2:
+
+Our data is from this source...
+https://catalog.data.gov/dataset/community-health-status-indicators-chsi-to-combat
+	-obesity-heart-disease-and-cancer/resource/d4ee960b-6047-4db9-a9ff-009e38a25c55
+
+It is from a csv file named RISKFACTORSANDACESSTOCARE.
+It holds information about 3000+ counties from multiple states.
+For each example county, it holds the prevalence of attributes that are considered
+risk factors for common diseases among the county's population.
+
+Among the attributes, the dataset includes the statistical probability of diabetes.
+We have reconfigured the dataset such that diabetes percentage will be used as a class attribute.
+We plan on using the other risk factors to attempt to find a correlation between them
+and the likelihood of diabetes within the region.
+
+
+# of examples: 3142
+# of attributes we are using: 24
+We removed some irrelevant attributes. County zip, FIPS code, etc.
+Atribute 24 is the class attribute
+
+Attributes!
+
+CHSI_County_Name	CHSI_State_Name	Community_Health_Center_Ind	No_Exercise	
+CI_Min_No_Exercise	CI_Max_No_Exercise	Few_Fruit_Veg	
+CI_Min_Fruit_Veg	CI_Max_Fruit_Veg	Obesity	CI_Min_Obesity
+CI_Max_Obesity	High_Blood_Pres	CI_Min_High_Blood_Pres	
+CI_Max_High_Blood_Pres	Smoker	CI_Min_Smoker
+CI_Max_Smoker	Uninsured	Elderly_Medicare	
+Disabled_Medicare	Prim_Care_Phys_Rate	Dentist_Rate	
+Diabetes							
+
+
+
+Three example lines!
+-1111.1 represents missing data
+
+Autauga	Alabama	1 27.8	20.7	34.9	78.6	69.4	87.8	24.5	17.3	31.7	
+29.1	19.2	39	26.6	19.1	34	5690	4762	1209	45.3	22.6	
+14.2							
+
+Baldwin	Alabama	1 27.2	23.2	31.2	76.2	71.2	81.3	23.6	19.5	27.6	
+30.5	24.5	36.6	24.6	20.3	28.8	19798	22635	3839	67	30.8	
+7.2							
+
+Butler	Alabama	1	24.5	15.5	33.5	-1111.1	-1111.1	-1111.1	22	13	
+31	-1111.1	-1111.1	-1111.1	27.3	17.6	37	4055	3150	952	43.3 19.3
+9.5							
+
+
+
+
+	

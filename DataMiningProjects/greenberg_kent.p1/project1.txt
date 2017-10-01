@@ -1,0 +1,26 @@
+README.txt
+Brian Greenberg and Nate Kent – project 1
+This project compares and illustrates the predictive accuracy of the different
+ classification approaches that we have explored so far in this class. In this
+ project, we will use the example dataset (UCI ML ‘Wine’) and run them through
+ several different sklearn classification algorithms.
+What the code will do…
+1.      Load the Wine dataset from url
+2.      Run experiments with various classification approaches, including
+ slight variations on each algorithm.
+3.      Plot and save confidence intervals to model and illustrate the
+ predictive accuracies of our models with different variations.
+4.      Generate p-values.
+5.      Generate confusion matrices for the dataset.
+Our classification approaches…
+1.      Decision trees, with variations on the max tree depth
+2.      Random Forests, with variations on the number of estimators
+3.      KPPs, with variations to K
+4.      ANNs, with variations to the hidden layers
+Files submitted…
+1.      A python file that will run non-interactively from the command line. 
+All other files included in the submission are generated from running the
+ python file.
+2.      A set of confidence intervals comparing each of the different
+ variations on each of our experiments.
+3.      A corresponding set of txt files and p-values.
