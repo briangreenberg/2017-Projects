@@ -1,0 +1,786 @@
+/* mouse2.c 
+
+Laura Toma
+
+What it does:  The user can enter a polygon by clicking on the mouse. 
+
+
+*/
+
+#include "geom.h"
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <assert.h>
+
+#ifdef __APPLE__
+#include <GLUT/glut.h>
+#else
+#include <GL/glut.h>
+#endif
+#include <iostream>
+#include <vector> 
+#include <float.h>
+using namespace std; 
+
+
+
+GLfloat red[3] = {1.0, 0.0, 0.0};
+GLfloat green[3] = {0.0, 1.0, 0.0};
+GLfloat blue[3] = {0.0, 0.0, 1.0};
+GLfloat black[3] = {0.0, 0.0, 0.0};
+GLfloat white[3] = {1.0, 1.0, 1.0};
+GLfloat gray[3] = {0.5, 0.5, 0.5};
+GLfloat yellow[3] = {1.0, 1.0, 0.0};
+GLfloat magenta[3] = {1.0, 0.0, 1.0};
+GLfloat cyan[3] = {0.0, 1.0, 1.0};
+
+GLint fillmode = 0;
+
+
+
+/* forward declarations of functions */
+void display(void);
+void keypress(unsigned char key, int x, int y);
+void mousepress(int button, int state, int x, int y);
+void timerfunc(); 
+void initialize_polygon(); 
+void print_polygon(vector<point2D> poly); 
+int isInside(point2D pointA);
+void visiblePolygon(point2D a);
+void moveGuard();
+int isSimple();
+double getDistance(point2D a, point2D b);
+
+/* our coordinate system is (0,0) x (WINDOWSIZE,WINDOWSIZE) where the
+   origin is the lower left corner */
+
+
+/* global variables */
+const int WINDOWSIZE = 500; 
+
+//the current polygon 
+vector<point2D>  poly;
+vector<point2D> visiblePoly;
+//cordinates of first point
+double first_x = -10;
+double first_y = -10;
+//coordinates of last mouse click
+double mouse_x=-10, mouse_y=-10; 
+//initialized to a point outside the window
+int timer = 0;
+int movement = 0;
+int direction = 1;
+//when this is 1, then clicking the mouse results in those points being stored in poly
+int poly_init_mode = 1; 
+
+
+
+
+
+void draw_circle(double x, double y){
+  glColor3fv(blue);   
+  int precision = 100;
+  double r = 4; 
+  double theta = 0;
+  glBegin(GL_POLYGON);
+  for(int i = 0; i < precision; i++){
+    theta = i * 2 * M_PI/precision;
+    glVertex2f(x + r*cos(theta), y + r*sin(theta));
+  }
+  glEnd();
+}
+
+void drawVisiblePolygon(double x, double y){
+  if(visiblePoly.size() != 0){
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glColor3fv(yellow);   
+    GLfloat a1x;
+    GLfloat a1y;
+    GLfloat a2x;
+    GLfloat a2y;
+    GLfloat b1x;
+    GLfloat b1y;
+    
+    int i;
+    for(i = 0; i < (int)visiblePoly.size()-1; i++){
+      a1x = x;
+      a1y = y;
+      a2x = visiblePoly[i].x;
+      a2y = visiblePoly[i].y;
+      b1x = visiblePoly[i+1].x;
+      b1y = visiblePoly[i+1].y;
+      
+      glColor3fv(green);
+      glBegin(GL_POLYGON);
+      glVertex2f(a1x, a1y);
+      glVertex2f(a2x, a2y);
+      glVertex2f(b1x, b1y);
+      glEnd();
+
+    }
+    //draw last triangle
+    
+    a1x = x;
+    a1y = y;
+    a2x = visiblePoly[visiblePoly.size()-1].x;
+    a2y = visiblePoly[visiblePoly.size()-1].y;
+    b1x = visiblePoly[0].x;
+    b1y = visiblePoly[0].y;
+    
+    glColor3fv(green);
+    glBegin(GL_POLYGON);
+    glVertex2f(a1x, a1y);
+    glVertex2f(a2x, a2y);
+    glVertex2f(b1x, b1y);
+    glEnd();
+    
+     
+  }
+}
+
+/* 
+Usage
+
+void glutMouseFunc(void (*func)(int button, int state, int x, int y));
+
+Description
+
+glutMouseFunc sets the mouse callback for the current window. When a
+user presses and releases mouse buttons in the window, each press and
+each release generates a mouse callback. The button parameter is one
+of GLUT_LEFT_BUTTON, GLUT_MIDDLE_BUTTON, or GLUT_RIGHT_BUTTON. For
+systems with only two mouse buttons, it may not be possible to
+generate GLUT_MIDDLE_BUTTON callback. For systems with a single mouse
+button, it may be possible to generate only a GLUT_LEFT_BUTTON
+callback. The state parameter is either GLUT_UP or GLUT_DOWN
+indicating whether the callback was due to a release or press
+respectively. The x and y callback parameters indicate the window
+relative coordinates when the mouse button state changed. If a
+GLUT_DOWN callback for a specific button is triggered, the program can
+assume a GLUT_UP callback for the same button will be generated
+(assuming the window still has a mouse callback registered) when the
+mouse button is released even if the mouse has moved outside the
+window.
+*/
+
+void mousepress(int button, int state, int x, int y) {
+
+
+  if(state == GLUT_DOWN) {
+    
+    mouse_x = x;
+    mouse_y = y;
+    //(x,y) are in wndow coordinates, where the origin is in the upper
+    //left corner; our reference system has the origin in lower left
+    //corner, this means we have to reflect y
+    mouse_y = WINDOWSIZE - mouse_y; 
+    //if this is the first point, 
+   
+    // printf("mouse click at (x=%d, y=%d)\n", (int)mouse_x, (int)mouse_y);
+    
+    if (poly_init_mode ==1) {
+      if(poly.size() != 0 && mouse_x <= poly[0].x + 4 
+	 && mouse_x >= poly[0].x -4 && mouse_y <= poly[0].y+4 && mouse_y >= poly[0].y -4){
+	poly_init_mode = 0;
+	visiblePoly.clear();
+      }else{
+     
+	point2D p;// = {(int)mouse_x, (int)mouse_y};
+	p.x = mouse_x;
+	p.y = mouse_y;
+	poly.push_back(p);
+      }
+    }else if(poly_init_mode == 0 && poly.size() != 0){
+      //draw visiblePoly
+      point2D guard;
+      guard.x = mouse_x;
+      guard.y = mouse_y;
+      printf("mouse click at (x=%d, y=%d)\n", (int)mouse_x, (int)mouse_y);
+      if(isInside(guard) == 0){printf("Not Inside!\n");movement = 0;}
+       //check if point is inside
+      visiblePoly.clear();
+      int inside = isInside(guard);
+      int simple = isSimple();
+       if(inside == 1 && simple == 1){
+	 // visiblePoly.clear();
+	 visiblePolygon(guard);
+       }else if(simple != 1){
+	 poly.clear();
+       }
+    }
+    
+  }
+  glutPostRedisplay();
+}
+
+/* returns the signed area of triangle abc. The area is positive if c
+   is to the left of ab, and negative if c is to the right of ab */
+
+/* ****************************** */
+/* initialize  polygon stored in global variable poly  */
+void initialize_polygon() {
+  
+  //clear the vector, in case something was there 
+  poly.clear(); 
+
+  int n = 10; //size of polygon 
+  double rad = 100; 
+  double step = 2 * M_PI / n;
+  point2D p; 
+  for (int i=0; i<n; i++) {
+
+    p.x = WINDOWSIZE/2 + rad * cos (i * step); 
+    p.y = WINDOWSIZE/2 + rad * sin (i * step); 
+
+
+    //insert the segment in the array of segments 
+    poly.push_back (p); 
+  } //for i
+}
+
+
+
+/* ************************************************** */
+void print_polygon(vector<point2D> poly) {
+
+  for (unsigned int i=0; i<poly.size()-1; i++) {
+    printf("edge %d: [(%f,%f), (%f,%f)]\n",
+	   i, poly[i].x, poly[i].y, poly[i+1].x, poly[i+1].y);
+  }
+  //print last edge from last point to first point 
+  int last = poly.size()-1; 
+    printf("edge %d: [(%f,%f), (%f,%f)]\n",
+	   last, poly[last].x, poly[last].y, poly[0].x, poly[0].y);
+
+}
+
+
+
+
+/* ****************************** */
+int main(int argc, char** argv) {
+
+  // initialize_polygon();
+  // print_polygon(poly);
+
+
+  /* initialize GLUT  */
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+  glutInitWindowSize(WINDOWSIZE, WINDOWSIZE);
+  glutInitWindowPosition(100,100);
+  glutCreateWindow(argv[0]);
+
+  /* register callback functions */
+  glutDisplayFunc(display); 
+  glutKeyboardFunc(keypress);
+  glutMouseFunc(mousepress); 
+   glutIdleFunc(timerfunc); 
+
+  /* init GL */
+  /* set background color black*/
+  glClearColor(0, 0, 0, 0);   
+  /* here we can enable depth testing and double buffering and so
+     on */
+
+  
+  /* give control to event handler */
+  glutMainLoop();
+  return 0;
+}
+
+
+
+/* ****************************** */
+/* draw the polygon */
+void draw_polygon(vector<point2D> poly, int color){
+
+  if (poly.size() == 0) return; 
+
+  //set color
+  if(color == 1){glColor3fv(yellow);}
+  if(color == 2){glColor3fv(blue);}
+
+
+  int i;
+  for (i=0; i< (int)poly.size()-1; i++) {
+    glBegin(GL_LINES);
+    glVertex2f(poly[i].x, poly[i].y); 
+    glVertex2f(poly[i+1].x, poly[i+1].y);
+    glEnd();
+  }
+  //render last segment between last point and forst point
+  if(poly_init_mode == 0){
+  int last=poly.size()-1; 
+    glBegin(GL_LINES);
+    glVertex2f(poly[last].x, poly[last].y); 
+    glVertex2f(poly[0].x, poly[0].y);
+    glEnd();
+  }
+  
+}
+
+
+
+
+
+/* ****************************** */
+void display(void) {
+
+  glClear(GL_COLOR_BUFFER_BIT);
+  glMatrixMode(GL_MODELVIEW); 
+  glLoadIdentity(); //clear the matrix
+
+
+  /* The default GL window is [-1,1]x[-1,1] with the origin in the
+     center. 
+     
+     Our system of coordinates (in which we generate our points) is
+     (0,0) to (WINSIZE,WINSIZE), with the origin in the lower left
+     corner.
+     
+     We need to map the points to [-1,1] x [-1,1]  
+     
+     Assume we are the local coordinate system. 
+     
+     First we scale down to [0,2] x [0,2] */ 
+  glScalef(2.0/WINDOWSIZE, 2.0/WINDOWSIZE, 1.0);  
+   /* Then we translate so the local origin goes in the middle of teh
+     window to (-WINDOWSIZE/2, -WINDOWSIZE/2) */
+  glTranslatef(-WINDOWSIZE/2, -WINDOWSIZE/2, 0); 
+
+  //now we draw in our local coordinate system (0,0) to
+  //(WINSIZE,WINSIZE), with the origin in the lower left corner.
+  // draw_polygon(poly, 1); 
+  
+  //draw a circle where the mouse was last clicked. Note that this
+  //point is stored as a global variable and is modified by the mouse
+  //handler function
+  // draw_circle(mouse_x, mouse_y); 
+  drawVisiblePolygon(mouse_x,mouse_y);
+  draw_circle(mouse_x, mouse_y);
+  draw_polygon(poly, 1);
+
+  /* execute the drawing commands */
+  glFlush();
+}
+
+point2D intersectionRay(point2D p1, point2D p2, point2D p3, point2D p4) {
+  double x1 = p1.x, x2 = p2.x, x3 = p3.x, x4 = p4.x;
+  double y1 = p1.y, y2 = p2.y, y3 = p3.y, y4 = p4.y;
+  point2D ret;
+  ret.x = -1;
+  ret.y = -1;
+
+  double d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  // If d is zero, there is no intersection                                                    
+  if (d == 0) return ret;
+
+  // Get the x and y                                                                           
+  double pre = (x1*y2 - y1*x2), post = (x3*y4 - y3*x4);
+  double x = ( pre * (x3 - x4) - (x1 - x2) * post ) / d;
+  double y = ( pre * (y3 - y4) - (y1 - y2) * post ) / d;
+
+  // Check if the x and y coordinates are within both lines
+  //check if the intersection is in the same direction as the guard
+  int posX;
+  int posY;
+  if((x2-x1)>0){posX = 1;}else{posX = 0;}
+  if((y2-y1)>0){posY = 1;}else{posY = 0;}
+  int pos2X;
+  int pos2Y;
+  if((x-x1)>0){pos2X = 1;}else{pos2X = 0;}
+  if((y-y1)>0){pos2Y = 1;}else{pos2Y = 0;}
+  if(posX == pos2X && posY == pos2Y){
+    //check that it is within the range of the edge
+    if (x < min(x3, x4) || x > max(x3, x4 )) return ret;                                               
+    if (y < min(y3, y4) || y > max(y3, y4)) return ret;        
+    ret.x = x;
+    ret.y = y;
+    // printf("Intersect Edge at (x=%f, y=%f)\n", ret.x, ret.y);
+    return ret;
+  }
+  return ret;
+  //if both have same signs then an intersection
+  /*
+
+  if ( x < min(x1, x2) || x > max(x1, x2) ||
+       x < min(x3, x4) || x > max(x3, x4) ) return ret;
+  if ( y < min(y1, y2) || y > max(y1, y2) ||
+       y < min(y3, y4) || y > max(y3, y4) ) return ret;
+  */
+  // Return the point of intersection                                                          
+}
+
+point2D intersection(point2D p1, point2D p2, point2D p3, point2D p4) {
+  double x1 = p1.x, x2 = p2.x, x3 = p3.x, x4 = p4.x;
+  double y1 = p1.y, y2 = p2.y, y3 = p3.y, y4 = p4.y;
+  point2D ret;
+  ret.x = -1;
+  ret.y = -1;
+
+  double d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  // If d is zero, there is no intersection
+  if (d == 0) return ret;
+  
+  // Get the x and y
+  double pre = (x1*y2 - y1*x2), post = (x3*y4 - y3*x4);
+  double x = ( pre * (x3 - x4) - (x1 - x2) * post ) / d;
+  double y = ( pre * (y3 - y4) - (y1 - y2) * post ) / d;
+  
+  // Check if the x and y coordinates are within both lines
+  if ( x < min(x1, x2) || x > max(x1, x2) ||  x < min(x3, x4) || x > max(x3, x4) ) return ret;
+  if ( y < min(y1, y2) || y > max(y1, y2) ||  y < min(y3, y4) || y > max(y3, y4) ) return ret;
+ 
+  // Return the point of intersection
+  
+  ret.x = x;
+  ret.y = y;
+  // printf("Intersect at (x=%d, y=%d)\n", (int)ret.x, (int)ret.y);
+  return ret;
+}
+
+double getDistance(point2D a, point2D b){
+  double distx, disty;
+  distx = pow((b.x - a.x),2.0);
+  disty = pow((b.y - a.y),2.0);
+  return sqrt(distx + disty);
+}
+
+bool isSame(point2D a, point2D b){
+  if(a.x == b.x && a.y == b.y){
+    return true;
+  }
+  return false;
+}
+void visiblePolygon(point2D a){
+  //check direction of points, i.e clockwise or otherwise
+  bool clockwise = true;
+  if(left(poly[2],poly[0],poly[1]) == 0){
+    clockwise = false;
+  }
+  
+  point2D b,c,d, inter;
+  int i, j;
+  bool lineIntersects = false;
+  vector<point2D> intersections;
+ 
+  bool tested = false;
+  for (i = 0; i < (int)poly.size(); i++){
+    b = poly[i];
+    for (j = 0; j < (int)poly.size(); j++){
+      int temp = j+1;
+      if(temp >= (int)poly.size()){
+	temp = 0;
+      }
+      if( i != j && i != temp){
+	tested = true;
+	c = poly[j];
+	d = poly[temp];
+	inter = intersection(a,b,c,d);
+	//if there is an intersection, disqualify the point
+	if(!(inter.x == -1 && inter.y == -1)){
+	  lineIntersects = true;
+	}
+	
+      }		
+    }
+    //if vertex can be seen, add it to the visiblepoly
+    if(!lineIntersects && tested){
+      visiblePoly.push_back(b);
+    }
+    tested = false;
+    lineIntersects = false;
+    //check if current vertex forms a convex
+    //loop around
+     if(i == 0){
+      c = poly[poly.size()-1];
+      d = poly[1];
+     }else if(i == (int)poly.size()-1){
+      c = poly[i-1];
+      d = poly[0];
+    }else{
+      c = poly[i-1];
+      d = poly[i+1];
+    }
+
+     if(visiblePoly.size() != 0){
+       if(isSame(b,visiblePoly[visiblePoly.size()-1])){
+	 //check of vertex is convex
+	 bool isConvex = false;
+	 if(!clockwise && right(b,c,d) == 1){
+	   isConvex = true;
+	 }else if(clockwise && left(b,c,d) == 1){
+	   isConvex = true;
+	 }
+	 if(isConvex){
+	   //check if vertex requires shooting                                           
+	   double first = signed_area2D(a,b,d);
+	   double second = signed_area2D(a,b,c);
+	   double min = 99999999999999999;
+	   double currDist;
+      //needs shooting if they are on the same direction
+	   point2D interPoint;
+	   point2D visiblePoint;
+	   visiblePoint.x = -1;
+	   visiblePoint.y = -1;
+	   if((first<0 && second<0)||(first>0 && second>0)){
+	     //look where the ray intersects with the an edge
+	     for(int k = 0; k < (int)poly.size(); k++){
+	       int next = k+1;
+	       if(next >= (int)poly.size()){
+		 next = 0;
+	       }
+	       if(k != i && next != i){
+		 interPoint = intersectionRay(a,b,poly[k],poly[next]);
+		 //if there is an intersection
+		 if(!(interPoint.x == -1 && interPoint.y == -1)){
+		   intersections.push_back(interPoint);
+		 }
+	       }
+	     }
+	   }
+	   //add the intersection to the visible polygon keeping the 
+	   // radial order intact
+	   //if left, add the intersection after the current point
+	   //if it is a valid point
+	   if(intersections.size() != 0){
+	     //find the closest
+	     visiblePoint = intersections[0];
+	     min = getDistance(a,visiblePoint);
+	     for(int n = 0; n < (int)intersections.size(); n++){
+	       currDist = getDistance(a,intersections[n]);
+	       if(currDist <= min){
+		 min = currDist;
+		 visiblePoint = intersections[n];
+	       }
+	     }
+	     if(!clockwise){
+	       if(first > 0){visiblePoly.push_back(visiblePoint);}
+	       //if to the right, intersection occurs before the vertex convex
+	       if(first<0){visiblePoly.insert(visiblePoly.begin() + visiblePoly.size()-1, visiblePoint);}
+	     }else{
+	       if(first < 0){visiblePoly.push_back(visiblePoint);}
+	       if(first>0){visiblePoly.insert(visiblePoly.begin() + visiblePoly.size()-1, visiblePoint);}
+	     }
+	     intersections.clear();
+	   }
+	 }
+       }
+     }
+     
+  }
+  //visiblePoly = poly;
+  // print_polygon(visiblePoly);
+  // print_polygon(poly);
+}
+
+int isSimple(){
+  point2D inter;
+  point2D a,b,c,d;
+  int i,j;
+  if(poly.size() < 3){return 0;}
+  for (i = 0; i < (int)poly.size()-1; i++){
+    a = poly[i];
+    b = poly[i+1];
+    for (j = 0; j < (int)poly.size()-1; j++){
+      if( i != j && i != j+1 && i+1 != j && i+1 != j+1){      
+	c = poly[j];
+	d = poly[j+1];
+	inter = intersection(a,b,c,d);
+	if(!(inter.x == -1 && inter.y == -1)){return 0;}
+      }
+    }
+  }
+
+  //check the last edge between first vertex and last vertex
+  a = poly[0];
+  b = poly[poly.size()-1];
+  for (j = 1; j < (int)poly.size()-2; j++){
+      c = poly[j];
+      d = poly[j+1];
+      inter = intersection(a,b,c,d);
+      if(!(inter.x == -1 && inter.y == -1)){return 0;}
+  }
+  return 1;
+}
+
+int isInside(point2D pointA){
+  point2D pointB, pointC, pointD, inter;
+  int i, count=0;
+  
+  pointB.y = 0;
+  pointB.x = 0;
+  for (i = 0; i < (int)poly.size()-1; i++){
+    pointC = poly[i];
+    pointD = poly[i+1];
+    inter = intersection(pointA, pointB, pointC, pointD);
+    if (!(inter.x == -1 && inter.y == -1)){count++;}
+  }
+  pointC = poly[poly.size()-1];
+  pointD = poly[0];
+  inter = intersection(pointA, pointB, pointC, pointD);
+  if (!(inter.x == -1 && inter.y == -1)){count++;}
+  if (count % 2 == 0){
+    return 0;
+  }
+  return 1;
+}
+void moveGuard(){
+  double translateX =0;
+  double translateY =0;
+  point2D c,d, inter;
+  if(poly.size() < 3){return;} 
+  switch(direction){
+  case 1:
+    translateX = 1;
+    translateY = 1;
+    break;
+  case 2:
+    translateX = 1;
+    translateY = 0;
+    break;
+  case 3:
+    translateX = 0;
+    translateY = 1;
+    break;
+  case 4:
+    translateX = -1;
+    translateY = -1;
+    break;
+  case 5:
+    translateX = 0;
+    translateY = -1;
+    break;
+  case 6:
+    translateX = -1;
+    translateY = 0;
+    break;
+  case 7:
+    translateX = -1;
+    translateY = 1;
+  case 8:
+    translateX = 1;
+    translateY = -1;
+    break;
+  }
+  point2D curr, next;
+  curr.x = mouse_x;
+  curr.y = mouse_y;
+  next.x = mouse_x + translateX;
+  next.y = mouse_y + translateY;
+  for (int j = 0; j < (int)poly.size()-1; j++){
+    c = poly[j];
+    d = poly[j+1];
+    inter = intersection(curr,next,c,d);
+    if(!(inter.x == -1 && inter.y == -1)){direction = 1 + (rand() % (int)(8 - 2 + 1)); timer = 4; return;}
+  }
+  c = poly[poly.size()-1];
+  d = poly[0];
+  inter = intersection(curr,next,c,d);
+  if(!(inter.x == -1 && inter.y == -1)){direction = 1 + (rand() % (int)(8 - 1 + 1)); timer = 4; return;}
+
+  mouse_x = next.x;
+  mouse_y = next.y;
+  draw_circle(mouse_x, mouse_y);
+  visiblePoly.clear();
+  point2D guard;
+  guard.x = mouse_x;
+  guard.y = mouse_y;
+  visiblePoly.clear();
+  int inside = isInside(guard);
+  if(inside == 1 && poly.size() > 1){
+    // visiblePoly.clear();                                                                                                      
+    visiblePolygon(guard);
+  }
+  glutPostRedisplay();
+  return;
+}
+
+/* ****************************** */
+void keypress(unsigned char key, int x, int y) {
+  switch(key) {
+  case 'q':
+    exit(0);
+    break;
+
+    //expected behaviour: press 's', then click on the points you
+    //want, and press 'e' when you're done. the points will be saved
+    //in global 'poly'
+  case 'm':
+    if(movement == 0){
+      movement = 1;
+    }else if(movement == 1){
+      movement = 0;
+    }
+    break;
+
+  case 's': 
+    //start re-initializeing polygon 
+    poly.clear();
+    visiblePoly.clear();
+     mouse_x = mouse_y=50; 
+    poly_init_mode = 1;
+    movement = 0;
+    glutPostRedisplay();
+    break; 
+    
+  case 'w':
+    moveGuard();
+    glutPostRedisplay();
+    break;
+
+  case 'v': 
+    //start re-initializeing polygon 
+    point2D mousePoint;
+    mousePoint.x = mouse_x; mousePoint.y = mouse_y;
+    isInside(mousePoint);
+    
+    visiblePolygon(mousePoint);
+    glutPostRedisplay();
+    break; 
+
+  case 'e': 
+    poly_init_mode=0; 
+    int simp = isSimple();
+     if(simp == 0){
+       printf("Not a simple polygon... Try Again\n");// poly.clear();
+     }
+    glutPostRedisplay();
+
+    break;
+
+  } 
+}
+
+
+/* Handler for window re-size event. Called back when the window first appears and
+   whenever the window is re-sized with its new width and height */
+void reshape(GLsizei width, GLsizei height) {  // GLsizei for non-negative integer
+     
+   // Set the viewport to cover the new window
+   glViewport(0, 0, width, height);
+ 
+   glMatrixMode(GL_PROJECTION);  // To operate on the Projection matrix
+   glLoadIdentity();             // Reset
+   gluOrtho2D(0.0, (GLdouble) width, 0.0, (GLdouble) height); 
+}
+
+
+
+void timerfunc() {
+  
+  //we don't do anything here; not yet 
+  if(movement == 0)return;
+  if(timer > 3
+){
+    moveGuard();    
+    timer = 0;
+  }
+  timer++;
+  glutPostRedisplay(); 
+  
+}
